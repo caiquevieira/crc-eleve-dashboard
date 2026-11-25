@@ -53,3 +53,17 @@ planilha completa.
 - O GitHub pausa agendamentos de repositórios sem commits há 60 dias. Se o painel parar
   de atualizar, reative em Actions.
 - Ao adicionar colunas novas na aba, ajuste os índices `COL_*` no topo de `scripts/build_data.py`.
+
+## Botão "Atualizar agora"
+
+No topo do painel. Pede login e senha de administrador (com o responsável; não ficam no
+repositório) e dispara a atualização na hora, recarregando o painel quando termina.
+
+Como funciona: um token do GitHub com permissão **apenas de Actions** neste repositório fica
+criptografado em `site/auth.json`; o login e a senha são a chave. Para configurar ou trocar a senha:
+
+1. Crie um token *fine-grained* em GitHub → Settings → Developer settings → Personal access tokens:
+   repositório `crc-eleve-dashboard`, permissão **Actions: Read and write**.
+2. Cole o token em `token.txt` na raiz do projeto (o arquivo é ignorado pelo git).
+3. `node scripts/encrypt_token.mjs <login> <senha>` → gera `site/auth.json` e apaga `token.txt`.
+4. Faça commit e push de `site/auth.json`.

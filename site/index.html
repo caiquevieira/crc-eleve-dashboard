@@ -69,6 +69,32 @@ body {
 header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 20px; }
 h1 { font-size: 22px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
 .updated { color: var(--text-muted); font-size: 13px; }
+.head-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.refresh-btn {
+  font: inherit; font-size: 13px; font-weight: 600; color: #fff; background: var(--series-1);
+  border: 0; border-radius: 8px; padding: 7px 14px; cursor: pointer;
+}
+.refresh-btn:hover { filter: brightness(1.08); }
+.refresh-btn:disabled { opacity: .6; cursor: progress; }
+.refresh-status { flex-basis: 100%; text-align: right; font-size: 13px; color: var(--text-secondary); min-height: 0; }
+.refresh-status:empty { display: none; }
+.refresh-status.good { color: var(--good); }
+.refresh-status.bad { color: var(--bad); }
+.tokdlg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+.tokdlg.on { display: flex; }
+.tokdlg .box { background: var(--surface-1); color: var(--text-primary); border-radius: 14px; max-width: 520px; width: 100%; padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+.tokdlg h2 { margin: 0 0 8px; font-size: 17px; }
+.tokdlg p, .tokdlg li { color: var(--text-secondary); font-size: 13px; }
+.tokdlg ol { padding-left: 18px; margin: 8px 0 12px; }
+.tokdlg a { color: var(--series-1); }
+.tokdlg input { width: 100%; font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--page); color: var(--text-primary); }
+.tokdlg .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+.tokdlg .actions .left { margin-right: auto; }
+.tokdlg button { font: inherit; border-radius: 8px; padding: 7px 14px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); }
+.tokdlg button.primary { background: var(--series-1); color: #fff; border-color: transparent; font-weight: 600; }
+.tokdlg button:disabled { opacity: .6; cursor: progress; }
+.tokdlg .fld { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); margin-top: 10px; }
+.login-err { color: var(--bad) !important; min-height: 1em; margin: 8px 0 0; }
 
 .filters {
   display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
@@ -141,7 +167,11 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
 <div class="wrap">
   <header>
     <h1>Produtividade CRC · Eleve</h1>
-    <span class="updated" id="updated">Carregando…</span>
+    <span class="head-right">
+      <span class="updated" id="updated">Carregando…</span>
+      <button type="button" class="refresh-btn" id="refresh">↻ Atualizar agora</button>
+    </span>
+    <span class="refresh-status" id="refresh-status" role="status" aria-live="polite"></span>
   </header>
 
   <div class="error" id="error"></div>
@@ -280,6 +310,23 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
     Fonte: aba “Produtividade” da planilha CRC - ELEVE, atualizada automaticamente. Este painel mostra apenas dados
     operacionais: nomes, telefones e observações dos pacientes não são publicados. A página recarrega os dados a cada 10 minutos.
   </footer>
+</div>
+
+<div class="tokdlg" id="tokdlg" role="dialog" aria-modal="true" aria-labelledby="tokTitle">
+  <div class="box">
+    <h2 id="tokTitle">Acesso de administrador</h2>
+    <p>Entre para atualizar os dados agora. O acesso fica lembrado neste navegador.</p>
+    <form id="login-form" autocomplete="off">
+      <label class="fld">Login<input id="login-user" autocomplete="username" required></label>
+      <label class="fld">Senha<input type="password" id="login-pass" autocomplete="current-password" required></label>
+      <p class="login-err" id="login-err" role="alert"></p>
+      <div class="actions">
+        <button type="button" class="left" id="tok-forget">Sair deste navegador</button>
+        <button type="button" id="tok-cancel">Cancelar</button>
+        <button type="submit" class="primary" id="tok-save">Entrar e atualizar</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -662,6 +709,111 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
   load(true);
   setInterval(() => load(false), 10 * 60 * 1000);
+  window.reloadDashboard = () => load(false);
+})();
+</script>
+
+<script>
+// Botão "Atualizar agora": dispara o workflow do GitHub Actions e recarrega quando terminar.
+(() => {
+  const REPO = 'caiquevieira/crc-eleve-dashboard';
+  const WF = 'dashboard.yml';
+  const API = 'https://api.github.com/repos/' + REPO + '/actions';
+  const KEY = 'gh-dashboard-token';
+  const $ = (s) => document.querySelector(s);
+  const btn = $('#refresh'), st = $('#refresh-status'), dlg = $('#tokdlg');
+
+  const getTok = () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } };
+  const setTok = (t) => { try { t ? localStorage.setItem(KEY, t) : localStorage.removeItem(KEY); } catch {} };
+  const gh = (path, opts = {}) => fetch(API + path, {
+    ...opts,
+    headers: { Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + getTok(), 'X-GitHub-Api-Version': '2022-11-28', ...(opts.headers || {}) },
+  });
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const status = (msg, kind) => { st.textContent = msg; st.className = 'refresh-status' + (kind ? ' ' + kind : ''); };
+
+  async function run() {
+    btn.disabled = true;
+    const started = Date.now() - 5000;
+    try {
+      status('Iniciando atualização…');
+      const r = await gh('/workflows/' + WF + '/dispatches', { method: 'POST', body: JSON.stringify({ ref: 'main' }) });
+      if (r.status === 401 || r.status === 403 || r.status === 404) {
+        setTok('');
+        status('O acesso expirou ou foi revogado no GitHub. Peça um novo token ao responsável.', 'bad');
+        return;
+      }
+      if (!r.ok) throw new Error('GitHub respondeu ' + r.status);
+
+      // Acompanha a execução disparada agora.
+      let runInfo = null;
+      for (let i = 0; i < 90; i++) {
+        await sleep(i < 3 ? 3000 : 5000);
+        const lr = await gh('/workflows/' + WF + '/runs?event=workflow_dispatch&per_page=5');
+        if (!lr.ok) continue;
+        const runs = (await lr.json()).workflow_runs || [];
+        runInfo = runs.find((x) => new Date(x.created_at).getTime() >= started) || runInfo;
+        if (!runInfo) { status('Aguardando o GitHub iniciar…'); continue; }
+        if (runInfo.status !== 'completed') { status('Atualizando os dados… (cerca de 1 min)'); continue; }
+        break;
+      }
+      if (!runInfo || runInfo.status !== 'completed') throw new Error('demorou mais que o esperado. Veja em GitHub → Actions');
+      if (runInfo.conclusion !== 'success') throw new Error('a execução falhou. Veja em GitHub → Actions');
+
+      status('Publicando…');
+      await sleep(8000);
+      await window.reloadDashboard();
+      status('Atualizado agora', 'good');
+      setTimeout(() => status(''), 8000);
+    } catch (e) {
+      status('Não foi possível atualizar: ' + e.message, 'bad');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // O token do GitHub vem criptografado em auth.json; login + senha formam a chave.
+  const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  async function unlock(user, pass) {
+    const res = await fetch('auth.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('O acesso de administrador ainda não foi configurado.');
+    const a = await res.json();
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(user + '\n' + pass), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: unb64(a.salt), iterations: a.iter, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    try {
+      const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(a.iv) }, key, unb64(a.ct));
+      return new TextDecoder().decode(pt);
+    } catch {
+      throw new Error('Login ou senha incorretos.');
+    }
+  }
+
+  function openDlg() { $('#login-err').textContent = ''; dlg.classList.add('on'); setTimeout(() => $('#login-user').focus(), 30); }
+  function closeDlg() { dlg.classList.remove('on'); $('#login-pass').value = ''; }
+
+  btn.addEventListener('click', () => (getTok() ? run() : openDlg()));
+  $('#login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const save = $('#tok-save');
+    save.disabled = true;
+    $('#login-err').textContent = 'Verificando…';
+    try {
+      const tok = await unlock($('#login-user').value.trim(), $('#login-pass').value);
+      setTok(tok);
+      closeDlg();
+      run();
+    } catch (err) {
+      $('#login-err').textContent = err.message;
+    } finally {
+      save.disabled = false;
+    }
+  });
+  $('#tok-cancel').addEventListener('click', closeDlg);
+  $('#tok-forget').addEventListener('click', () => { setTok(''); closeDlg(); status('Você saiu deste navegador'); });
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) closeDlg(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDlg(); });
 })();
 </script>
 </body>

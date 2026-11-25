@@ -4,3 +4,4 @@
 *.csv
 site/data.json
 __pycache__/
+token.txt
