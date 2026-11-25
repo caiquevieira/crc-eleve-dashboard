@@ -38,7 +38,7 @@ Ao alterar o código do CRM: **Implantar → Gerenciar implantações → editar
 (assim a URL continua a mesma).
 
 Cada CRC escolhe o próprio nome em "Você é" no primeiro acesso; os novos agendamentos já vêm com ele.
-
+## Dashboard
 
 Painel publicado no GitHub Pages com os indicadores da aba **Produtividade** da
 planilha "CRC - ELEVE Leads Agendamentos" (Google Drive).
