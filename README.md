@@ -1,49 +1,11 @@
-# CRM e Dashboard de Produtividade CRC · Eleve
+# Dashboard de Produtividade CRC · Eleve
 
-- **CRM** (cadastro e acompanhamento dos agendamentos): https://caiquevieira.github.io/crc-eleve-dashboard/crm/
-- **Dashboard**: https://caiquevieira.github.io/crc-eleve-dashboard/
-
-A planilha do Google é o banco de dados: o CRM lê e grava direto na aba **Produtividade**,
-e o dashboard é gerado a partir dela.
-
-## CRM (Google Apps Script)
-
-Código em `apps-script/`. Ele roda dentro da própria planilha, com login pela conta Google:
-só quem tem **permissão de edição** na planilha consegue abrir o CRM.
-
-Recursos: visões Hoje / Amanhã / Próximos 7 dias / A confirmar / Status pendente / Todos,
-busca por nome ou telefone, link direto para o WhatsApp, mudança rápida de confirmação e
-status na lista, e formulário completo para novo agendamento ou edição.
-
-### Instalação (uma vez, na conta dona da planilha)
-
-1. Abra o .xlsx no Drive → **Arquivo → Salvar como Planilhas Google**. Use essa nova planilha daqui em diante.
-2. Compartilhe a nova planilha com as CRCs como **Editor**. Para o dashboard atualizar sozinho,
-   deixe também **"Qualquer pessoa com o link: Leitor"**.
-3. Na planilha: **Extensões → Apps Script**.
-   - Substitua o conteúdo de `Código.gs` pelo de `apps-script/Code.gs`.
-   - **+ → HTML**, nome `Index`, e cole `apps-script/Index.html`.
-   - Salve.
-4. **Implantar → Nova implantação → App da Web**
-   - Executar como: **Usuário que acessa o app da Web**
-   - Quem pode acessar: **Qualquer pessoa com uma Conta do Google**
-   - Autorize o acesso. Como o app não é verificado pelo Google, clique em
-     *Avançado → Acessar CRM (não seguro)*; isso é normal para scripts internos.
-5. Copie a URL do app (termina em `/exec`) e, no GitHub:
-   - Secret `SHEET_FILE_ID` = ID da **nova** planilha
-   - Variable `CRM_URL` = URL do app (*Settings → Secrets and variables → Actions → Variables*)
-   - Rode *Actions → Atualizar dashboard → Run workflow*.
-
-Ao alterar o código do CRM: **Implantar → Gerenciar implantações → editar → Nova versão**
-(assim a URL continua a mesma).
-
-Cada CRC escolhe o próprio nome em "Você é" no primeiro acesso; os novos agendamentos já vêm com ele.
-## Dashboard
+https://caiquevieira.github.io/crc-eleve-dashboard/
 
 Painel publicado no GitHub Pages com os indicadores da aba **Produtividade** da
 planilha "CRC - ELEVE Leads Agendamentos" (Google Drive).
 
-## Dashboard: como funciona
+## Como funciona
 
 1. A cada 30 minutos (07h–20h, seg a sáb) o GitHub Actions baixa a planilha do Drive.
 2. `scripts/build_data.py` lê a aba Produtividade e gera `data.json` só com campos

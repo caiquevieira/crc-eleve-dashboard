@@ -35,12 +35,6 @@ jobs:
           SHEET_FILE_ID: ${{ secrets.SHEET_FILE_ID }}
         run: python scripts/build_data.py --out site/data.json
 
-      - name: Link do CRM
-        env:
-          CRM_URL: ${{ vars.CRM_URL }}
-        run: |
-          python -c "import json,os; json.dump({'crmUrl': os.environ.get('CRM_URL','')}, open('site/config.json','w'))"
-
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

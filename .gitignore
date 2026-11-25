@@ -4,4 +4,3 @@
 *.csv
 site/data.json
 __pycache__/
-site/config.json
