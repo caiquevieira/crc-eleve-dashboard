@@ -1,0 +1,6 @@
+# Nunca versionar a planilha nem os dados gerados (contêm/derivam de dados de pacientes)
+*.xlsx
+*.xls
+*.csv
+site/data.json
+__pycache__/
