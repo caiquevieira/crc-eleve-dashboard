@@ -195,10 +195,21 @@ def load_workbook(args) -> openpyxl.Workbook:
     file_id = os.environ.get("SHEET_FILE_ID", "").strip()
     if not file_id:
         sys.exit("Defina SHEET_FILE_ID (ID do arquivo no Google Drive) ou use --xlsx.")
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    req = urllib.request.Request(url, headers={"User-Agent": "dashboard-builder"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        data = r.read()
+    # Planilha Google nativa (export) ou arquivo .xlsx no Drive (download direto).
+    urls = [
+        f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx",
+        f"https://drive.google.com/uc?export=download&id={file_id}",
+    ]
+    data = b""
+    for url in urls:
+        req = urllib.request.Request(url, headers={"User-Agent": "dashboard-builder"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                data = r.read()
+        except Exception:
+            continue
+        if data.startswith(b"PK"):
+            break
     if not data.startswith(b"PK"):
         sys.exit("O download não retornou um .xlsx. Verifique se o arquivo está compartilhado "
                  "como 'Qualquer pessoa com o link'.")
