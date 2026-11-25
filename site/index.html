@@ -726,6 +726,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   const getTok = () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } };
   const setTok = (t) => { try { t ? localStorage.setItem(KEY, t) : localStorage.removeItem(KEY); } catch {} };
   const gh = (path, opts = {}) => fetch(API + path, {
+    cache: 'no-store', // a API do GitHub manda cache de 60 s; sem isso o andamento fica parado
     ...opts,
     headers: { Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + getTok(), 'X-GitHub-Api-Version': '2022-11-28', ...(opts.headers || {}) },
   });
@@ -734,10 +735,17 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
 
   async function run() {
     btn.disabled = true;
-    const started = Date.now() - 5000;
     try {
       status('Iniciando atualização…');
-      const r = await gh('/workflows/' + WF + '/dispatches', { method: 'POST', body: JSON.stringify({ ref: 'main' }) });
+      // Última execução antes do clique: a nova é a primeira com número maior que este.
+      const lb = await gh('/workflows/' + WF + '/runs?per_page=1');
+      const before = lb.ok ? (((await lb.json()).workflow_runs || [])[0] || {}).id || 0 : 0;
+
+      const dispatch = (body) => gh('/workflows/' + WF + '/dispatches', { method: 'POST', body: JSON.stringify(body) });
+      let r = await dispatch({ ref: 'main', return_run_details: true });
+      if (r.status === 422) r = await dispatch({ ref: 'main' });
+      let runId = null;
+      if (r.status === 200) { try { runId = (await r.json()).workflow_run_id || null; } catch {} }
       if (r.status === 401 || r.status === 403 || r.status === 404) {
         setTok('');
         status('O acesso expirou ou foi revogado no GitHub. Peça um novo token ao responsável.', 'bad');
@@ -749,10 +757,18 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       let runInfo = null;
       for (let i = 0; i < 90; i++) {
         await sleep(i < 3 ? 3000 : 5000);
-        const lr = await gh('/workflows/' + WF + '/runs?event=workflow_dispatch&per_page=5');
-        if (!lr.ok) continue;
-        const runs = (await lr.json()).workflow_runs || [];
-        runInfo = runs.find((x) => new Date(x.created_at).getTime() >= started) || runInfo;
+        try {
+          if (runId) {
+            const rr = await gh('/runs/' + runId);
+            if (rr.ok) runInfo = await rr.json();
+          } else {
+            const lr = await gh('/workflows/' + WF + '/runs?per_page=5');
+            if (!lr.ok) continue;
+            const runs = (await lr.json()).workflow_runs || [];
+            const found = runs.filter((x) => x.id > before).sort((a, b) => a.id - b.id)[0];
+            if (found) { runId = found.id; runInfo = found; }
+          }
+        } catch { continue; } // oscilação de rede: tenta de novo na próxima volta
         if (!runInfo) { status('Aguardando o GitHub iniciar…'); continue; }
         if (runInfo.status !== 'completed') { status('Atualizando os dados… (cerca de 1 min)'); continue; }
         break;
