@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   schedule:
-    # A cada 30 min, das 07h às 20h (horário de Brasília = UTC-3), seg a sáb
+    # Automático: a cada 30 min, das 07h às 20h (Brasília = UTC-3), seg a sáb
     - cron: "7,37 10-23 * * 1-6"
   workflow_dispatch:
 
@@ -15,14 +15,11 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  build-deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -50,5 +47,12 @@ jobs:
         with:
           path: site
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
